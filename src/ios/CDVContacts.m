@@ -89,11 +89,11 @@
 {
     id val = [dict valueForKey:key];
     bool exists = false;
-    
+
     if (val != nil) {
         exists = [(NSString*)val compare : expectedValue options : NSCaseInsensitiveSearch] == 0;
     }
-    
+
     return exists;
 }
 
@@ -182,12 +182,12 @@
         desiredFields = [NSArray arrayWithObjects:@"*", nil];
     }
     NSMutableDictionary* options = [NSMutableDictionary dictionaryWithCapacity:2];
-    
+
     [options setObject: desiredFields forKey:@"fields"];
     [options setObject: [NSNumber numberWithBool: FALSE] forKey:@"allowsEditing"];
-    
+
     NSArray* args = [NSArray arrayWithObjects:options, nil];
-    
+
     CDVInvokedUrlCommand* newCommand = [[CDVInvokedUrlCommand alloc] initWithArguments:args
                  callbackId:command.callbackId
                   className:command.className
@@ -211,12 +211,14 @@
     // if no permissions granted try to request them first
     if (status == kABAuthorizationStatusNotDetermined) {
         ABAddressBookRequestAccessWithCompletion(addressBook, ^(bool granted, CFErrorRef error) {
-            if (granted) {
-                [self chooseContact:newCommand];
-                return;
-            }
+            dispatch_async(dispatch_get_main_queue(), ^(void){
+                if (granted) {
+                    [self chooseContact:newCommand];
+                    return;
+                }
 
-            [self.commandDelegate sendPluginResult: errorResult callbackId:command.callbackId];
+                [self.commandDelegate sendPluginResult: errorResult callbackId:command.callbackId];
+            });
         });
     }
 }
@@ -252,9 +254,9 @@
         }
         CFRelease(addrBook);
     }
-    
+
     NSNumber* recordId = picker.pickedContactDictionary[kW3ContactId];
-    
+
     [[peoplePicker presentingViewController] dismissViewControllerAnimated:YES completion:^{
         CDVPluginResult* result = nil;
         if ([recordId isEqualToNumber:[NSNumber numberWithInt:kABRecordInvalidID]]) {
@@ -271,7 +273,7 @@
 {
     CDVContactsPicker* picker = (CDVContactsPicker*)peoplePicker;
     NSNumber* pickedId = [NSNumber numberWithInt:ABRecordGetRecordID(person)];
-    
+
     if (picker.allowsEditing) {
         ABPersonViewController* personController = [[ABPersonViewController alloc] init];
         personController.displayedPerson = person;
@@ -279,7 +281,7 @@
         personController.allowsEditing = picker.allowsEditing;
         // store id so can get info in peoplePickerNavigationControllerDidCancel
         picker.pickedContactDictionary = [NSDictionary dictionaryWithObjectsAndKeys:pickedId, kW3ContactId, nil];
-        
+
         [peoplePicker pushViewController:personController animated:YES];
     } else {
         // Retrieve and return pickedContact information
@@ -287,7 +289,7 @@
         NSArray* fields = [picker.options objectForKey:@"fields"];
         NSDictionary* returnFields = [[CDVContact class] calcReturnFields:fields];
         picker.pickedContactDictionary = [pickedContact toDictionary:returnFields];
-        
+
         [[picker presentingViewController] dismissViewControllerAnimated:YES completion:^{
             CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:picker.pickedContactDictionary];
             [self.commandDelegate sendPluginResult:result callbackId:picker.callbackId];
